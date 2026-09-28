@@ -4,8 +4,7 @@ chcp 65001 >nul
 color 0B
 
 echo ╔══════════════════════════════════════════════════╗
-echo ║   🔔 BEL SEKOLAH - AUTO DEPLOY 🔔               ║
-echo ║   Push + Tag + Build otomatis                    ║
+echo ║   🔔 BEL SEKOLAH - AUTO DEPLOY (v2 FIXED)       ║
 echo ╚══════════════════════════════════════════════════╝
 echo.
 
@@ -15,123 +14,101 @@ set REPO_NAME=bel-sekolah
 set BRANCH=main
 REM =====================================================
 
-REM ==== Cek Git ====
 where git >nul 2>nul
 if %errorlevel% neq 0 (
     echo [ERROR] Git belum terinstall!
     pause & exit /b 1
 )
 
-REM ==== Cek .git ====
 if not exist .git (
-    echo [ERROR] Repo belum di-init!
-    echo Jalankan dulu: setup-pertama-kali.bat
+    echo [ERROR] Repo belum di-init! Jalankan setup-pertama-kali.bat
     pause & exit /b 1
 )
 
-REM ==== Input versi ====
-echo.
-echo Masukkan versi release
-echo Contoh: 1.0.0  ^|  1.2.3  ^|  2.0.0
-echo.
+echo Masukkan versi release (contoh: 1.0.0)
 set /p VERSION="Versi: "
+if "%VERSION%"=="" (echo Versi wajib diisi! & pause & exit /b 1)
 
-if "%VERSION%"=="" (
-    echo [ERROR] Versi tidak boleh kosong!
-    pause & exit /b 1
-)
-
-set /p COMMIT_MSG="Pesan commit (kosong = default): "
+set /p COMMIT_MSG="Pesan commit (Enter = default): "
 if "%COMMIT_MSG%"=="" set COMMIT_MSG=🚀 Release v%VERSION%
 
 echo.
-echo ═══════════════════════════════════════════════════
-echo    Versi    : v%VERSION%
-echo    Commit   : %COMMIT_MSG%
-echo    Repo     : %GITHUB_USER%/%REPO_NAME%
-echo ═══════════════════════════════════════════════════
+echo Versi  : v%VERSION%
+echo Commit : %COMMIT_MSG%
+echo Repo   : %GITHUB_USER%/%REPO_NAME%
 echo.
 set /p CONFIRM="Lanjut? (Y/N): "
-if /i not "%CONFIRM%"=="Y" (
-    echo Dibatalkan.
-    pause & exit /b 0
-)
+if /i not "%CONFIRM%"=="Y" (echo Dibatalkan. & pause & exit /b 0)
 
 echo.
 
-REM ==== STEP 1: Clean ====
-echo [1/7] 🧹 Membersihkan cache build lama...
+REM ==== 1. Clean ====
+echo [1/7] 🧹 Membersihkan cache...
 if exist dist rmdir /s /q dist 2>nul
 if exist out rmdir /s /q out 2>nul
-echo       OK
-echo.
+echo       OK & echo.
 
-REM ==== STEP 2: Cek status ====
-echo [2/7] 📋 Cek status repo...
+REM ==== 2. Cek status ====
+echo [2/7] 📋 Cek status...
 git status --short
 echo.
 
-REM ==== STEP 3: Stage ====
-echo [3/7] 📦 Stage semua file...
+REM ==== 3. Stage ====
+echo [3/7] 📦 Stage...
 git add .
-echo       OK
-echo.
+echo       OK & echo.
 
-REM ==== STEP 4: Commit ====
-echo [4/7] 💾 Commit perubahan...
+REM ==== 4. Commit ====
+echo [4/7] 💾 Commit...
 git commit -m "%COMMIT_MSG%" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo       (tidak ada perubahan baru, lanjut ke tag)
+    echo       (tidak ada perubahan baru)
 ) else (
-    echo       OK - Commit dibuat
+    echo       OK
 )
 echo.
 
-REM ==== STEP 5: Push branch ====
-echo [5/7] 🚀 Push ke GitHub (%BRANCH%)...
-git push -u origin %BRANCH%
-if %errorlevel% neq 0 (
+REM ==== 5. Push (dengan auto-fallback force) ====
+echo [5/7] 🚀 Push ke GitHub...
+git push -u origin %BRANCH% 2>&1 | findstr /C:"rejected" >nul
+if %errorlevel%==0 (
     echo.
-    echo [ERROR] Push gagal! Cek koneksi / kredensial.
-    pause & exit /b 1
+    echo       ⚠️  Push ditolak (non-fast-forward^)
+    echo       → Mencoba force push otomatis...
+    echo.
+    git push -f -u origin %BRANCH%
+    if !errorlevel! neq 0 (
+        echo [ERROR] Force push gagal juga!
+        pause & exit /b 1
+    )
 )
-echo       OK
-echo.
+echo       OK & echo.
 
-REM ==== STEP 6: Buat tag ====
+REM ==== 6. Tag ====
 echo [6/7] 🏷️  Buat tag v%VERSION%...
 git tag -d "v%VERSION%" >nul 2>&1
 git tag -a "v%VERSION%" -m "Release v%VERSION%"
-echo       OK
-echo.
+echo       OK & echo.
 
-REM ==== STEP 7: Push tag (trigger build) ====
-echo [7/7] 🎯 Push tag (trigger auto-build)...
+REM ==== 7. Push Tag ====
+echo [7/7] 🎯 Push tag (trigger build^)...
 git push origin "v%VERSION%"
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] Push tag gagal!
-    pause & exit /b 1
+    echo       ⚠️  Tag sudah ada, coba force...
+    git push -f origin "v%VERSION%"
 )
-echo       OK
-echo.
+echo       OK & echo.
 
 echo ╔══════════════════════════════════════════════════╗
 echo ║   ✅ DEPLOY BERHASIL!                            ║
 echo ╚══════════════════════════════════════════════════╝
 echo.
-echo   📊 Cek progress build (3-5 menit):
-echo      https://github.com/%GITHUB_USER%/%REPO_NAME%/actions
-echo.
-echo   📦 Download .exe setelah selesai:
-echo      https://github.com/%GITHUB_USER%/%REPO_NAME%/releases
+echo   📊 Cek build  : https://github.com/%GITHUB_USER%/%REPO_NAME%/actions
+echo   📦 Download   : https://github.com/%GITHUB_USER%/%REPO_NAME%/releases
 echo.
 
-REM ==== Auto buka browser ====
-set /p OPEN="Buka halaman Actions di browser? (Y/N): "
-if /i "%OPEN%"=="Y" (
-    start https://github.com/%GITHUB_USER%/%REPO_NAME%/actions
-)
+set /p OPEN="Buka halaman Actions? (Y/N): "
+if /i "%OPEN%"=="Y" start https://github.com/%GITHUB_USER%/%REPO_NAME%/actions
 
-echo.
 pause
