@@ -1,13 +1,18 @@
 {
   "name": "bel-sekolah",
   "version": "1.0.0",
-  "description": "Aplikasi Bel Sekolah Otomatis SMPN 8 Ciamis",
+  "description": "Bel Sekolah Elektron dengan WhatsApp Gateway",
   "main": "src/main.js",
   "author": "SMPN 8 Ciamis",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win --x64"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "qrcode": "^1.5.4",
+    "pino": "^9.5.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",
