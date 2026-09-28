@@ -1,0 +1,69 @@
+name: 🔔 Build Bel Sekolah
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install deps
+        run: npm ci
+
+      - name: 🔨 Build EXE
+        run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📤 Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BelSekolah-Windows
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+          retention-days: 30
+
+      - name: 🚀 Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Bel Sekolah ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/*.exe
+            dist/*.blockmap
+          body: |
+            ## 🔔 Bel Sekolah Elektron ${{ github.ref_name }}
+            
+            ### 📥 Download
+            - **BelSekolah-Setup-*.exe** → Installer
+            - **BelSekolah-Portable-*.exe** → Portable
+            
+            ### ✨ Fitur
+            - Jadwal bel otomatis
+            - WhatsApp gateway (Baileys)
+            - TTS Bahasa Indonesia
+            - Log aktivitas
+            
+            ### 💻 Sistem: Windows 10/11 (64-bit)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
