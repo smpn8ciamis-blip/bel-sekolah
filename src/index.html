@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Bel Sekolah Elektron</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+  body { background: #0f172a; color: #f1f5f9; min-height: 100vh; padding: 20px; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 { text-align: center; font-size: 2em; margin-bottom: 20px; color: #6366f1; }
+  .clock { text-align: center; padding: 30px; background: #1e293b; border-radius: 16px; margin-bottom: 20px; }
+  .time { font-size: 4em; font-weight: bold; color: #6366f1; letter-spacing: 4px; font-family: monospace; }
+  .date { font-size: 1.2em; color: #94a3b8; margin-top: 10px; }
+  .card { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { color: #6366f1; margin-bottom: 12px; font-size: 1.1em; }
+  button {
+    background: #6366f1; color: white; border: none; padding: 10px 20px;
+    border-radius: 8px; cursor: pointer; font-weight: bold; margin: 4px;
+    transition: 0.2s;
+  }
+  button:hover { background: #4f46e5; transform: translateY(-1px); }
+  button.danger { background: #ef4444; }
+  button.success { background: #10b981; }
+  button.warning { background: #f59e0b; }
+  input {
+    background: #334155; color: white; border: 1px solid #475569;
+    padding: 10px; border-radius: 8px; width: 100%; margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔔 Bel Sekolah Elektron</h1>
+  
+  <div class="clock">
+    <div class="time" id="clockTime">00:00:00</div>
+    <div class="date" id="clockDate">-</div>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ Kontrol</h2>
+    <button class="success" onclick="playTestBell()">🔔 Test Bel</button>
+    <button onclick="toggleFullscreen()">⛶ Fullscreen</button>
+  </div>
+
+  <div class="card">
+    <h2>📅 Tambah Jadwal</h2>
+    <input type="time" id="inpTime">
+    <input type="text" id="inpLabel" placeholder="Nama bel (cth: Masuk Sekolah)">
+    <button class="success" onclick="addSchedule()">💾 Simpan</button>
+  </div>
+
+  <div class="card">
+    <h2>📋 Daftar Jadwal</h2>
+    <div id="scheduleList">Belum ada jadwal</div>
+  </div>
+</div>
+
+<script>
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockTime').textContent = 
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0') + ':' +
+    String(now.getSeconds()).padStart(2,'0');
+  
+  const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  document.getElementById('clockDate').textContent = 
+    days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Audio
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playBell() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  [0, 0.8].forEach(t => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0, now + t);
+    gain.gain.linearRampToValueAtTime(0.5, now + t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + t + 0.6);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now + t);
+    osc.stop(now + t + 0.7);
+  });
+}
+
+function playTestBell() {
+  playBell();
+  if ('speechSynthesis' in window) {
+    const u = new SpeechSynthesisUtterance('Tes bel sekolah');
+    u.lang = 'id-ID';
+    speechSynthesis.speak(u);
+  }
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
+}
+
+// Simple schedule (localStorage)
+let schedules = JSON.parse(localStorage.getItem('schedules') || '[]');
+
+function addSchedule() {
+  const time = document.getElementById('inpTime').value;
+  const label = document.getElementById('inpLabel').value.trim();
+  if (!time || !label) return alert('Isi waktu dan nama bel!');
+  
+  schedules.push({ time, label, enabled: true });
+  localStorage.setItem('schedules', JSON.stringify(schedules));
+  renderSchedules();
+  document.getElementById('inpLabel').value = '';
+  document.getElementById('inpTime').value = '';
+}
+
+function renderSchedules() {
+  const el = document.getElementById('scheduleList');
+  if (schedules.length === 0) {
+    el.innerHTML = 'Belum ada jadwal';
+    return;
+  }
+  el.innerHTML = schedules.map((s, i) => 
+    `<div style="padding:8px;background:#334155;border-radius:8px;margin:4px 0;">
+      <strong>${s.time}</strong> - ${s.label}
+      <button class="danger" style="float:right;padding:4px 10px;" onclick="deleteSchedule(${i})">X</button>
+    </div>`
+  ).join('');
+}
+
+function deleteSchedule(i) {
+  schedules.splice(i, 1);
+  localStorage.setItem('schedules', JSON.stringify(schedules));
+  renderSchedules();
+}
+
+// Cek jadwal tiap detik
+setInterval(() => {
+  const now = new Date();
+  const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  if (now.getSeconds() !== 0) return;
+  schedules.forEach(s => {
+    if (s.enabled && s.time === time) {
+      playBell();
+      if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance(s.label);
+        u.lang = 'id-ID';
+        setTimeout(() => speechSynthesis.speak(u), 1500);
+      }
+    }
+  });
+}, 1000);
+
+renderSchedules();
+</script>
+</body>
+</html>
